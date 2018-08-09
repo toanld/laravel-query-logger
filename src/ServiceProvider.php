@@ -49,15 +49,23 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
         ]);
 
         if ($this->logger) {
-            $this->logger->info('-- ------ REQUESTED AT '. Carbon::now()->toDateTimeString() .' ------ --');
-            $this->app['db']->listen(function($query, $bindings = null, $time = null, $name = null) {
+            $time = Carbon::now()->toDateTimeString();
+            $time_count = 0;
+            $this->app['db']->listen(function($query, $bindings = null, $time = null, $name = null) use(&$time_count,&$time) {
                 if ($query instanceof \Illuminate\Database\Events\QueryExecuted) {
+                    $time_count = $query->time;
                     $formattedQuery = $this->formatQuery($query->sql, $query->bindings, $query->connection);
                 } else {
+                    $time_count = $query->time;
                     $formattedQuery = $this->formatQuery($query, $bindings, $this->app['db']->connection($name));
                 }
-
-                $this->logger->info($formattedQuery);
+                $query_log = [
+                    'time'=>$time,
+                    'time_count'=>$time_count,
+                    'query'=>$formattedQuery
+                ];
+                $query_log = json_encode($query_log);
+                $this->logger->info($query_log);
             });
         }
     }
