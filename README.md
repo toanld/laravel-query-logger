@@ -10,7 +10,7 @@ You can also use this package with Lumen.
 Import package using composer:
 
 ```shell
-composer require ngoctp/laravel-query-logger --dev
+composer require toanld/laravel-query-logger --dev
 ```
 
 ### Add service to Laravel >=5.5

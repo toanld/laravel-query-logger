@@ -1,5 +1,5 @@
 {
-    "name": "ngoctp/laravel-query-logger",
+    "name": "toanld/laravel-query-logger",
     "description": "Log database queries for Laravel project",
 	"license": "MIT",
     "require": {
