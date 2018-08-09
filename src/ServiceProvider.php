@@ -50,9 +50,9 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
         ]);
 
         if ($this->logger) {
-            $time = Carbon::now()->toDateTimeString();
+            $timestemp = Carbon::now()->toDateTimeString();
             $time_count = 0;
-            $this->app['db']->listen(function($query, $bindings = null, $time = null, $name = null) use(&$time_count,&$time) {
+            $this->app['db']->listen(function($query, $bindings = null, $time = null, $name = null) use(&$time_count,&$timestemp) {
               $arrDebug = debug_backtrace();
               $arrTemp = [];
               foreach($arrDebug as $key => $val){
@@ -78,7 +78,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
                     $formattedQuery = $this->formatQuery($query, $bindings, $this->app['db']->connection($name));
                 }
                 $query_log = [
-                    'time'=>$time,
+                    'time'=>$timestemp,
                     'time_count'=>$time_count,
                     'query'=>$formattedQuery,
                     'src'=>$arrTemp
