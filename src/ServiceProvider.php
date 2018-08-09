@@ -25,9 +25,8 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
     public function register()
     {
         $this->mergeConfigFrom($this->getConfigPath(), 'query_logger');
-
         if ($this->isLoggerEnabled()) {
-            $filePath = config('query_logger.file_path');
+            $filePath = config('query_logger.query_path');
             if ($filePath) {
                 $streamHandler = new StreamHandler($filePath, Logger::INFO);
                 $streamHandler->setFormatter(new LineFormatter("%message%;\n"));
@@ -53,39 +52,47 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
             $timestemp = Carbon::now()->toDateTimeString();
             $time_count = 0;
             $this->app['db']->listen(function($query, $bindings = null, $time = null, $name = null) use(&$time_count,&$timestemp) {
-              $arrDebug = debug_backtrace();
-              $arrTemp = [];
-              foreach($arrDebug as $key => $val){
-                  if(!isset($val["file"]) && !isset($val["class"]) && !isset($val["function"])) continue;
-                  $file = (isset($val["file"])) ? $val["file"] : (isset($val["class"]) ? $val["class"] : (isset($val["function"]) ? $val["function"] : ''));
-                  if(isset($val['object']))unset($val['object']);
-                  if(isset($val['args']))unset($val['args']);
-                  if(isset($val['type']))unset($val['type']);
-                  if((strpos($file,"vendor") !== false) || (strpos($file,"Laravel") !== false)){
-
-                  }else{
-                      $arrTemp[] =$val;
-                  }
-                  //$arrTemp[] =$val;
-              }
-              unset($arrDebug);
-
+                $time_execute = number_format($query->time / 1000,6);
                 if ($query instanceof \Illuminate\Database\Events\QueryExecuted) {
-                    $time_count = $query->time;
                     $formattedQuery = $this->formatQuery($query->sql, $query->bindings, $query->connection);
                 } else {
-                    $time_count = $query->time;
                     $formattedQuery = $this->formatQuery($query, $bindings, $this->app['db']->connection($name));
                 }
-                $query_log = [
-                    'time'=>$timestemp,
-                    'time_count'=>$time_count,
-                    'query'=>$formattedQuery,
-                    'src'=>$arrTemp
-                ];
-//                dd(DB::getQueryLog());
-                $query_log = json_encode($query_log);
-                $this->logger->info($query_log);
+                if($time_execute > config('query_logger.time_slow')){
+                    $arrDebug = debug_backtrace();
+                    $arrTemp = [];
+                    foreach($arrDebug as $key => $val){
+                        if(!isset($val["file"]) && !isset($val["class"]) && !isset($val["function"])) continue;
+                        $file = (isset($val["file"])) ? $val["file"] : (isset($val["class"]) ? $val["class"] : (isset($val["function"]) ? $val["function"] : ''));
+                        if(isset($val['object']))unset($val['object']);
+                        if(isset($val['args']))unset($val['args']);
+                        if(isset($val['type']))unset($val['type']);
+                        if((strpos($file,"vendor") !== false) || (strpos($file,"Laravel") !== false)){
+
+                        }else{
+                            $arrTemp[] =$val;
+                        }
+                        //$arrTemp[] =$val;
+                    }
+                    unset($arrDebug);
+                    $query_log = [
+                        'timestemp'=>$timestemp,
+                        'time_execute'=>$time_execute,
+                        'query'=>$formattedQuery,
+                        'src'=>$arrTemp
+                    ];
+                    $query_log = json_encode($query_log);
+                    $this->logger->info($query_log);
+                }else{
+                    $query_log = [
+                        'timestemp'=>$timestemp,
+                        'time_execute'=>$time_execute,
+                        'query'=>$formattedQuery
+                    ];
+                    $query_log = json_encode($query_log);
+                    $this->logger->info($query_log);
+                }
+
             });
         }
     }
