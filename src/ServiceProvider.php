@@ -44,6 +44,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
      */
     public function boot()
     {
+
         $this->publishes([
             $this->getConfigPath() => config_path('query_logger.php'),
         ]);
@@ -52,6 +53,23 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
             $time = Carbon::now()->toDateTimeString();
             $time_count = 0;
             $this->app['db']->listen(function($query, $bindings = null, $time = null, $name = null) use(&$time_count,&$time) {
+              $arrDebug = debug_backtrace();
+              $arrTemp = [];
+              foreach($arrDebug as $key => $val){
+                  if(!isset($val["file"]) && !isset($val["class"]) && !isset($val["function"])) continue;
+                  $file = (isset($val["file"])) ? $val["file"] : (isset($val["class"]) ? $val["class"] : (isset($val["function"]) ? $val["function"] : ''));
+                  if(isset($val['object']))unset($val['object']);
+                  if(isset($val['args']))unset($val['args']);
+                  if(isset($val['type']))unset($val['type']);
+                  if((strpos($file,"vendor") !== false) || (strpos($file,"Laravel") !== false)){
+
+                  }else{
+                      $arrTemp[] =$val;
+                  }
+                  //$arrTemp[] =$val;
+              }
+              unset($arrDebug);
+
                 if ($query instanceof \Illuminate\Database\Events\QueryExecuted) {
                     $time_count = $query->time;
                     $formattedQuery = $this->formatQuery($query->sql, $query->bindings, $query->connection);
@@ -62,8 +80,10 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
                 $query_log = [
                     'time'=>$time,
                     'time_count'=>$time_count,
-                    'query'=>$formattedQuery
+                    'query'=>$formattedQuery,
+                    'src'=>$arrTemp
                 ];
+//                dd(DB::getQueryLog());
                 $query_log = json_encode($query_log);
                 $this->logger->info($query_log);
             });
