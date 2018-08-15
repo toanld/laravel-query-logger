@@ -25,9 +25,8 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
     public function register()
     {
         $this->mergeConfigFrom($this->getConfigPath(), 'query_logger');
-
         if ($this->isLoggerEnabled()) {
-            $filePath = config('query_logger.file_path');
+            $filePath = config('query_logger.query_path');
             if ($filePath) {
                 $streamHandler = new StreamHandler($filePath, Logger::INFO);
                 $streamHandler->setFormatter(new LineFormatter("%message%;\n"));
@@ -42,8 +41,8 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
      *
      * @return void
      */
-     public function boot()
-        {
+      public function boot()
+    {
 
         $this->publishes([
             $this->getConfigPath() => config_path('query_logger.php'),
