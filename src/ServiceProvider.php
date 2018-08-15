@@ -42,34 +42,46 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
      *
      * @return void
      */
-    public function boot()
-    {
+     public function boot()
+        {
 
         $this->publishes([
             $this->getConfigPath() => config_path('query_logger.php'),
         ]);
 
         if ($this->logger) {
-            $timestemp = Carbon::now()->toDateTimeString();
+            $time = Carbon::now()->toDateTimeString();
             $time_count = 0;
-            $this->app['db']->listen(function($query, $bindings = null, $time = null, $name = null) use(&$time_count,&$timestemp) {
-              $arrDebug = debug_backtrace();
-              $arrTemp = [];
-              foreach($arrDebug as $key => $val){
-                  if(!isset($val["file"]) && !isset($val["class"]) && !isset($val["function"])) continue;
-                  $file = (isset($val["file"])) ? $val["file"] : (isset($val["class"]) ? $val["class"] : (isset($val["function"]) ? $val["function"] : ''));
-                  if(isset($val['object']))unset($val['object']);
-                  if(isset($val['args']))unset($val['args']);
-                  if(isset($val['type']))unset($val['type']);
-                  if((strpos($file,"vendor") !== false) || (strpos($file,"Laravel") !== false)){
+            $this->app['db']->listen(function ($query, $bindings = null, $time = null, $name = null) use (&$time_count, &$time) {
+                $arrDebug = debug_backtrace();
+                $arrTemp = [];
+                foreach ($arrDebug as $key => $val) {
+                    if (!isset($val["file"]) && !isset($val["class"]) && !isset($val["function"])) continue;
+                    $file = (isset($val["file"])) ? $val["file"] : (isset($val["class"]) ? $val["class"] : (isset($val["function"]) ? $val["function"] : ''));
+                    if (isset($val['object'])) unset($val['object']);
+                    if (isset($val['args'])) unset($val['args']);
+                    if (isset($val['type'])) unset($val['type']);
 
-                  }else{
-                      $arrTemp[] =$val;
-                  }
-                  //$arrTemp[] =$val;
-              }
-              unset($arrDebug);
+                    if (isset($val['class'])) {
+                        if (strpos($val['class'], 'Routing\Pipeline') !== false || strpos($val['class'], 'Lumen\Application')) {
+                            continue;
+                        } else if (strpos($val['class'], 'Eloquent\Builder') !== false) {
+                            unset($val['class']);
+                        }
+                    }
+                    if (isset($val['function'])) {
+                        if (strpos($val['function'], 'first') !== false) {
+                            unset($val['function']);
 
+                        }
+                    }
+                    if ((strpos($file, "vendor") !== false) || (strpos($file, "Laravel") !== false) || (strpos($file, "Illuminate") !== false) || (strpos($file, "Routing") !== false)) {
+                    } else {
+                        $arrTemp[] = $val;
+                    }
+                }
+                $arrTemp = collect($arrTemp)->collapse();
+                unset($arrDebug);
                 if ($query instanceof \Illuminate\Database\Events\QueryExecuted) {
                     $time_count = $query->time;
                     $formattedQuery = $this->formatQuery($query->sql, $query->bindings, $query->connection);
@@ -78,12 +90,11 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
                     $formattedQuery = $this->formatQuery($query, $bindings, $this->app['db']->connection($name));
                 }
                 $query_log = [
-                    'time'=>$timestemp,
-                    'time_count'=>$time_count,
-                    'query'=>$formattedQuery,
-                    'src'=>$arrTemp
+                    'time' => $time,
+                    'time_count' => $time_count,
+                    'query' => $formattedQuery,
+                    'src' => $arrTemp
                 ];
-//                dd(DB::getQueryLog());
                 $query_log = json_encode($query_log);
                 $this->logger->info($query_log);
             });
