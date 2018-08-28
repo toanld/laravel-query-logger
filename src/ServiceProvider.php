@@ -49,9 +49,9 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
         ]);
 
         if ($this->logger) {
-            $time = Carbon::now()->toDateTimeString();
+            $date_time = Carbon::now()->toDateTimeString();
             $time_count = 0;
-            $this->app['db']->listen(function ($query, $bindings = null, $time = null, $name = null) use (&$time_count, &$time) {
+            $this->app['db']->listen(function ($query, $bindings = null, $time = null, $name = null) use (&$time_count, &$date_time) {
                 $arrDebug = debug_backtrace();
                 $arrTemp = [];
                 foreach ($arrDebug as $key => $val) {
@@ -60,7 +60,6 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
                     if (isset($val['object'])) unset($val['object']);
                     if (isset($val['args'])) unset($val['args']);
                     if (isset($val['type'])) unset($val['type']);
-
                     if (isset($val['class'])) {
                         if (strpos($val['class'], 'Routing\Pipeline') !== false || strpos($val['class'], 'Lumen\Application')) {
                             continue;
@@ -79,7 +78,6 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
                         $arrTemp[] = $val;
                     }
                 }
-                $arrTemp = collect($arrTemp)->collapse();
                 unset($arrDebug);
                 if ($query instanceof \Illuminate\Database\Events\QueryExecuted) {
                     $time_count = $query->time;
@@ -89,7 +87,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
                     $formattedQuery = $this->formatQuery($query, $bindings, $this->app['db']->connection($name));
                 }
                 $query_log = [
-                    'time' => $time,
+                    'time' => $date_time,
                     'time_count' => $time_count,
                     'query' => $formattedQuery,
                     'src' => $arrTemp
