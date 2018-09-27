@@ -14,10 +14,7 @@
     "autoload": {
         "psr-4": {
             "NgocTP\\QueryLogger\\": "src/"
-        },
-        "files": [
-            "src/helpers.php"
-        ]
+        }
     },
     "extra": {
         "laravel": {

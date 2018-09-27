@@ -16,6 +16,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
      * @var \Monolog\Logger $logger
      */
     protected $logger = null;
+    protected $queries = [];
 
     /**
      * Register the application services.
@@ -24,16 +25,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
      */
     public function register()
     {
-        $this->mergeConfigFrom($this->getConfigPath(), 'query_logger');
-        if ($this->isLoggerEnabled()) {
-            $filePath = config('query_logger.query_path');
-            if ($filePath) {
-                $streamHandler = new StreamHandler($filePath, Logger::INFO);
-                $streamHandler->setFormatter(new LineFormatter("%message%;\n"));
-                $this->logger = new Logger('query_logger');
-                $this->logger->pushHandler($streamHandler);
-            }
-        }
+        $this->app["queries"] = [];
     }
 
     /**
@@ -41,58 +33,63 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
      *
      * @return void
      */
-    public function boot()
+      public function boot()
     {
 
-        $this->publishes([
-            $this->getConfigPath() => config_path('query_logger.php'),
-        ]);
-
-        if ($this->logger) {
-            $timestemp = Carbon::now()->toDateTimeString();
+        if(config('query.enabled')){
+            $date_time = Carbon::now()->toDateTimeString();
             $time_count = 0;
-            $this->app['db']->listen(function($query, $bindings = null, $time = null, $name = null) use(&$time_count,&$timestemp) {
-                $time_execute = number_format($query->time / 1000,6);
+            $this->app['db']->listen(function ($query, $bindings = null, $time = null, $name = null) use (&$time_count, &$date_time) {
+                $arrDebug = debug_backtrace();
+                $arrTemp = [];
+                foreach ($arrDebug as $key => $val) {
+                    if (!isset($val["file"]) && !isset($val["class"]) && !isset($val["function"])) continue;
+                    $file = (isset($val["file"])) ? $val["file"] : (isset($val["class"]) ? $val["class"] : (isset($val["function"]) ? $val["function"] : ''));
+                    if (isset($val['object'])) unset($val['object']);
+                    if (isset($val['args'])) unset($val['args']);
+                    if (isset($val['type'])) unset($val['type']);
+                    if (isset($val['class'])) {
+                        if (strpos($val['class'], 'Routing\Pipeline') !== false || strpos($val['class'], 'Lumen\Application')) {
+                            continue;
+                        } else if (strpos($val['class'], 'Eloquent\Builder') !== false) {
+                            unset($val['class']);
+                        }
+                    }
+                    if (isset($val['function'])) {
+                        if (strpos($val['function'], 'first') !== false) {
+                            unset($val['function']);
+
+                        }
+                    }
+                    if ((strpos($file, "vendor") !== false) || (strpos($file, "Laravel") !== false) || (strpos($file, "Illuminate") !== false) || (strpos($file, "Routing") !== false)) {
+                    } else {
+                        $arrTemp[] = $val;
+                    }
+                }
+                unset($arrDebug);
+                $time_count = $query->time;
                 if ($query instanceof \Illuminate\Database\Events\QueryExecuted) {
                     $formattedQuery = $this->formatQuery($query->sql, $query->bindings, $query->connection);
                 } else {
                     $formattedQuery = $this->formatQuery($query, $bindings, $this->app['db']->connection($name));
                 }
-                if($time_execute > config('query_logger.time_slow')){
-                    $arrDebug = debug_backtrace();
-                    $arrTemp = [];
-                    foreach($arrDebug as $key => $val){
-                        if(!isset($val["file"]) && !isset($val["class"]) && !isset($val["function"])) continue;
-                        $file = (isset($val["file"])) ? $val["file"] : (isset($val["class"]) ? $val["class"] : (isset($val["function"]) ? $val["function"] : ''));
-                        if(isset($val['object']))unset($val['object']);
-                        if(isset($val['args']))unset($val['args']);
-                        if(isset($val['type']))unset($val['type']);
-                        if((strpos($file,"vendor") !== false) || (strpos($file,"Laravel") !== false)){
-
-                        }else{
-                            $arrTemp[] =$val;
-                        }
-                        //$arrTemp[] =$val;
-                    }
-                    unset($arrDebug);
-                    $query_log = [
-                        'timestemp'=>$timestemp,
-                        'time_execute'=>$time_execute,
-                        'query'=>$formattedQuery,
-                        'src'=>$arrTemp
-                    ];
-                    $query_log = json_encode($query_log);
-                    $this->logger->info($query_log);
-                }else{
-                    $query_log = [
-                        'timestemp'=>$timestemp,
-                        'time_execute'=>$time_execute,
-                        'query'=>$formattedQuery
-                    ];
-                    $query_log = json_encode($query_log);
-                    $this->logger->info($query_log);
+                $duration = doubleval(number_format($time_count / 1000,10,".",""));
+                $query_log = [
+                    'time' => $duration,
+                    'date' => $date_time,
+                    'query' => $formattedQuery,
+                    'file_line' => $arrTemp
+                ];
+                if($duration > config('query.time_slow')){
+                    @file_put_contents(config('query.slow_path'),json_encode($query_log) . "\n",FILE_APPEND);
                 }
-
+                if(config('query.log_query')){
+                    @file_put_contents(config('query.query_path'),json_encode($query_log) . "\n",FILE_APPEND);
+                }
+                $queries = $this->app["queries"];
+                $queries[] = $query_log;
+                $this->app["queries"] = $queries;
+                unset($queries,$query_log);
             });
         }
     }
@@ -121,23 +118,6 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
         return $query;
     }
 
-    private function isLoggerEnabled()
-    {
-        $enabled = config('query_logger.enabled');
-        if (is_null($enabled)) {
-            $enabled = config('app.debug');
-            if (is_null($enabled)) {
-                $enabled = env('APP_DEBUG', false);
-            }
-        }
-
-        return $enabled;
-    }
-
-    private function getConfigPath()
-    {
-        return __DIR__ . '/../config/query_logger.php';
-    }
 
     /**
      * Check bindings for illegal (non UTF-8) strings, like Binary data.
