@@ -36,7 +36,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
       public function boot()
     {
 
-        if(config('query.enabled')){
+        if(config('query_debug.enabled')){
             $date_time = Carbon::now()->toDateTimeString();
             $time_count = 0;
             $this->app['db']->listen(function ($query, $bindings = null, $time = null, $name = null) use (&$time_count, &$date_time) {
@@ -80,11 +80,11 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
                     'query' => $formattedQuery,
                     'file_line' => $arrTemp
                 ];
-                if($duration > config('query.time_slow')){
-                    @file_put_contents(config('query.slow_path'),json_encode($query_log) . "\n",FILE_APPEND);
+                if($duration > config('query_debug.time_slow')){
+                    @file_put_contents(config('query_debug.slow_path'),json_encode($query_log,JSON_UNESCAPED_UNICODE,JSON_PRETTY_PRINT) . "\n",FILE_APPEND);
                 }
-                if(config('query.log_query')){
-                    @file_put_contents(config('query.query_path'),json_encode($query_log) . "\n",FILE_APPEND);
+                if(config('query_debug.log_query')){
+                    @file_put_contents(config('query_debug.query_path'),json_encode($query_log,JSON_UNESCAPED_UNICODE,JSON_PRETTY_PRINT) . "\n",FILE_APPEND);
                 }
                 $queries = $this->app["queries"];
                 $queries[] = $query_log;
