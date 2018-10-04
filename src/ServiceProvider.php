@@ -4,15 +4,13 @@ namespace NgocTP\QueryLogger;
 
 use Monolog\Logger;
 use Monolog\Handler\StreamHandler;
-use DB;
-use Illuminate\Database\Events\QueryExecuted;
 use Monolog\Formatter\LineFormatter;
 use Carbon\Carbon;
 
 class ServiceProvider extends \Illuminate\Support\ServiceProvider
 {
     /**
-     * 
+     *
      * @var \Monolog\Logger $logger
      */
     protected $logger = null;
@@ -42,9 +40,11 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
             $this->app['db']->listen(function ($query, $bindings = null, $time = null, $name = null) use (&$time_count, &$date_time) {
                 $arrDebug = debug_backtrace();
                 $arrTemp = [];
+                $pathReplace = realpath(dirname(__FILE__) . "/../../../../");
                 foreach ($arrDebug as $key => $val) {
                     if (!isset($val["file"]) && !isset($val["class"]) && !isset($val["function"])) continue;
                     $file = (isset($val["file"])) ? $val["file"] : (isset($val["class"]) ? $val["class"] : (isset($val["function"]) ? $val["function"] : ''));
+                    $file = str_replace($pathReplace,"",$file);
                     if (isset($val['object'])) unset($val['object']);
                     if (isset($val['args'])) unset($val['args']);
                     if (isset($val['type'])) unset($val['type']);
@@ -61,6 +61,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
 
                         }
                     }
+
                     if ((strpos($file, "vendor") !== false) || (strpos($file, "Laravel") !== false) || (strpos($file, "Illuminate") !== false) || (strpos($file, "Routing") !== false)) {
                     } else {
                         $arrTemp[] = $val;
